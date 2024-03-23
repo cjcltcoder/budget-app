@@ -1,86 +1,91 @@
 const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
+const { requireAuth } = require('../middleware/authMiddleware'); // Import the requireAuth middleware
+const jwt = require('jsonwebtoken');
 
 // Create a new user
 router.post('/', async (req, res) => {
-    try {
-      const { email, password } = req.body; // Only extract email and password
-      const existingUser = await User.findOne({ email });
-      if (existingUser) {
-        return res.status(400).json({ message: 'Email already exists' });
-      }
-      const newUser = new User({ email, password }); // Create new user with email and password
-      await newUser.save();
-      res.status(201).json(newUser);
-    } catch (error) {
-      console.error('Error creating user:', error);
-      res.status(500).json({ message: 'Server error' });
-    }
-  });
-  
-
-// Login route
-router.post('/login', async (req, res) => {
-    const { email, password } = req.body;
-    try {
-      // Find user by email
-      const user = await User.findOne({ email });
-      if (!user) {
-        return res.status(400).json({ message: 'Invalid email or password' });
-      }
-      // Check password
-      const isPasswordValid = await user.isValidPassword(password);
-      if (!isPasswordValid) {
-        return res.status(400).json({ message: 'Invalid email or password' });
-      }
-      // User authenticated successfully
-      res.status(200).json({ message: 'Login successful', user });
-    } catch (error) {
-      res.status(500).json({ message: error.message });
-    }
-  });
-
-// Update a user by ID
-router.patch('/:id', getUser, async (req, res) => {
-  if (req.body.name != null) {
-    res.user.name = req.body.name;
-  }
-  if (req.body.username != null) {
-    res.user.username = req.body.username;
-  }
-  if (req.body.password != null) {
-    res.user.password = req.body.password;
-  }
   try {
-    const updatedUser = await res.user.save();
-    res.json(updatedUser);
+    const { email, password } = req.body;
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ message: 'Email already exists' });
+    }
+    const newUser = new User({ email, password });
+    await newUser.save();
+    res.status(201).json(newUser);
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    console.error('Error creating user:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
-// Delete a user by ID
-router.delete('/:id', getUser, async (req, res) => {
+// Login route
+router.post('/login', async (req, res) => {
+  const { email, password } = req.body;
   try {
-    await res.user.remove();
-    res.json({ message: 'User deleted' });
+    const user = await User.findOne({ email });
+    if (!user || !(await user.isValidPassword(password))) {
+      return res.status(400).json({ message: 'Invalid email or password' });
+    }
+    const token = jwt.sign({ userId: user._id, email: user.email }, 'unbreakable key', { expiresIn: '1h' });
+    res.status(200).json({ message: 'Login successful', token });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 });
 
-async function getUser(req, res, next) {
+// Protected route: Get user profile
+router.get('/profile', requireAuth, async (req, res) => {
   try {
-    const user = await User.findById(req.params.id);
-    if (user == null) {
+    // Access the authenticated user's information from req.userData
+    const { userId } = req.userData;
+
+    // Find the user in the database
+    const user = await User.findById(userId);
+    if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-    res.user = user;
-    next();
+
+    // Return the user's profile information
+    res.status(200).json(user);
   } catch (error) {
-    return res.status(500).json({ message: error.message });
+    console.error('Error fetching user profile:', error);
+    res.status(500).json({ message: 'Server error' });
   }
-}
+});
+
+// Update user profile
+router.patch('/profile', requireAuth, async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    const user = await User.findById(req.userData.userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    if (email) user.email = email;
+    if (password) user.password = password; // You might want to hash the password before saving
+    await user.save();
+    res.status(200).json({ message: 'User updated successfully' });
+  } catch (error) {
+    console.error('Error updating user profile:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Delete user
+router.delete('/profile', requireAuth, async (req, res) => {
+  try {
+    const user = await User.findByIdAndDelete(req.userData.userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    res.status(200).json({ message: 'User deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting user:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
 
 module.exports = router;
