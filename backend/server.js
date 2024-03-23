@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const authRoutes = require('./routes/authRoutes');
-const { requireAuth } = require('./middleware/authMiddleware');
+const userRoutes = require('./routes/userRoutes'); // Import user routes
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -19,5 +19,6 @@ mongoose.connect('mongodb://localhost:27017/budget-app')
 
 // Routes
 app.use('/auth', authRoutes);
+app.use('/users', userRoutes); // Use user routes
 
 module.exports = app; // Export for testing purposes
