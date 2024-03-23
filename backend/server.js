@@ -4,6 +4,8 @@ const bodyParser = require('body-parser');
 const cors = require('cors');
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
+const budgetRoutes = require('./routes/budgetRoutes'); // Import budgetRoutes
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 
@@ -19,5 +21,6 @@ mongoose.connect('mongodb://localhost:27017/budget-app')
 // Routes
 app.use('/auth', authRoutes);
 app.use('/users', userRoutes);
+app.use('/budgets', budgetRoutes); // Use budgetRoutes
 
 module.exports = app;
